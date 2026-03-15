@@ -1,0 +1,5 @@
+.env.local
+bun.lock
+node_modules/
+spacetimedb/dist/
+src/module_bindings/
