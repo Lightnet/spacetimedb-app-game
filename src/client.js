@@ -115,8 +115,6 @@ console.log(conn.reducers);
 // console.log("vanjs test");
 
 function App(){
-
-  
   const isEdit = van.state(false);
   const message = van.state('');
   const text_content = van.state('');
@@ -202,4 +200,22 @@ function App(){
 
 van.add(document.body, App());
 
+window.addEventListener('keydown',(event)=>{
+  console.log("Key: ", event.code);
+  if(event.code == 'KeyW'){
+    conn.reducers.updateInput({
+      directionX:0.0,
+      directionY:1.0,
+      jump:false,
+    })
+  }
+  if(event.code == 'KeyS'){
+    conn.reducers.updateInput({
+      directionX:0.0,
+      directionY:-1.0,
+      jump:false,
+    })
+  }
 
+  
+})
