@@ -12,6 +12,8 @@ const {div, button, label, input, li, ul} = van.tags;
 const chat_messages = div();
 
 const chat_box = div();
+
+const entity_position = div();
 const el_status = van.state('None');
 const username = van.state('Guest');
 
@@ -26,6 +28,29 @@ function apply_messages(ctx){
   console.log(`Ready with ${ctx.db.message.count()} messages`);
   console.log(ctx);
 }
+
+function check_position(row){
+  const elEntity = document.getElementById(row.identity.toHexString())
+  //entity_position
+  if(elEntity){
+    elEntity.remove();
+    van.add(entity_position,div({id:row.identity.toHexString()},
+      label('entity:' + row.identity.toHexString().substring(0,16)),
+      label(" x: ",row.x),
+      label(" y: ",row.y),
+      label(" z: ",row.z)
+    ))
+  }else{
+    van.add(entity_position,div({id:row.identity.toHexString()},
+      label('entity:' + row.identity.toHexString().substring(0,16)),
+      label(" x: ",row.x),
+      label(" y: ",row.y),
+      label(" z: ",row.z)
+    ))
+  }
+}
+
+
 // https://spacetimedb.com/docs/clients/api/
 // 
 // spacetime sql --server local spacetime-app-map "SELECT * FROM user"
@@ -63,6 +88,10 @@ const conn = DbConnection.builder()
         })
         .subscribe(tables.message);
 
+    conn
+      .subscriptionBuilder()
+      .subscribe(tables.Entity);
+
     conn.db.user.onInsert((ctx, row)=>{
       // console.log('insert user row');
       // console.log(row);
@@ -97,6 +126,20 @@ const conn = DbConnection.builder()
       ))
 
     });
+
+    conn.db.Entity.onInsert((ctx, row)=>{
+      console.log('insert entity row');
+      console.log(row);
+      check_position(row);
+    });
+
+    // any change on user.
+    conn.db.Entity.onUpdate((ctx, oldRow, newRow)=>{
+      console.log("update???");
+      console.log("oldRow:", oldRow);
+      console.log("newRow:", newRow);
+      check_position(newRow);
+    })
 
   })
   .onDisconnect(() => {
@@ -195,6 +238,7 @@ function App(){
         
         chat_box,
         chat_messages,
+        entity_position
     )
 }
 
@@ -217,5 +261,23 @@ window.addEventListener('keydown',(event)=>{
     })
   }
 
+  if(event.code == 'KeyR'){
+    console.log('reset');
+    conn.reducers.setPlayerPosition({
+      x:0,
+      y:0,
+      z:0,
+    })
+  }
+
   
 })
+
+window.addEventListener('keyup',(event)=>{
+  console.log("key up");
+    conn.reducers.updateInput({
+      directionX:0.0,
+      directionY:0.0,
+      jump:false,
+    })
+});

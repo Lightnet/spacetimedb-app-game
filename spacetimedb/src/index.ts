@@ -114,9 +114,53 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
   // arg.message, arg.scheduled_at, arg.scheduled_id
   // console.log('update_simulation_tick');
   // console.log(arg);
+
+  const fixedDtMs = 50;           // your fixed tick rate
+  const dt = fixedDtMs / 1000;    // in seconds
+
   for (const player of ctx.db.PlayerInput.iter()){
     // console.log(player);
-    console.log(player.identity.toHexString(), " x:", player.directionX, " y:", player.directionY, " Jump:", player.jump);
+    // console.log(player.identity.toHexString(), " x:", player.directionX, " y:", player.directionY, " Jump:", player.jump);
+    console.log("player input >>", " x:", player.directionX, " y:", player.directionY, " Jump:", player.jump);
+
+    const entity = ctx.db.Entity.identity.find(player.identity);
+    console.log(entity);
+    if(entity){
+
+      const speed = 5.0; // units per second
+      if(player.directionX == 0){
+        entity.vx = 0;
+      }else{
+        entity.vx += player.directionX * speed * dt;
+      }
+
+      if(player.directionY == 0){
+        entity.vz = 0;
+      }else{
+        entity.vz += player.directionY * speed * dt;
+      }
+      
+      // Integrate position
+      entity.x += entity.vx * dt;
+      entity.z += entity.vz * dt;
+
+      //update data from table row match
+      ctx.db.Entity.identity.update({
+        ...entity,
+      })
+      console.log("Position x: ", entity.x , " z: ", entity.z );
+
+    }else{// if does not exist create tmp
+       ctx.db.Entity.insert({
+         identity: player.identity,
+         x: 0,
+         y: 0,
+         z: 0,
+         vx: 0,
+         vy: 0,
+         vz: 0
+       });
+    }
   }
 });
 //-----------------------------------------------
@@ -158,6 +202,22 @@ export const update_input = spacetimedb.reducer(
 //-----------------------------------------------
 // 
 //-----------------------------------------------
+
+export const set_player_position = spacetimedb.reducer({
+  x:t.f64(),
+  y:t.f64(),
+  z:t.f64(),
+},(ctx, args) => {
+  const entity = ctx.db.Entity.identity.find(ctx.sender);
+  console.log("entity: ", entity);
+  if(entity){
+    entity.x = 0;
+    entity.y = 0;
+    entity.z = 0;
+    ctx.db.Entity.identity.update(entity);
+  }
+});
+
 
 //-----------------------------------------------
 // 

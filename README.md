@@ -10,6 +10,18 @@
 - Typescript
 - Javascript
 
+# Packages:
+- spacetimedb 2.0.4
+- three 0.183.2
+- typescript 5.9.3
+- vite 8.0.0
+- vanjs 1.6.0
+
+# Game Features:
+- input move (wip)
+- entity (wip)
+- collision ( n/a )
+
 # Information:
   Work in progress.
 
@@ -27,9 +39,13 @@
 
   By using the Schedule API and query table names.
 
-  I can think of those postgresql or sqlite since they trigger conditions. But limited without module scripts access.
+  By using threejs to build 3D for 2.5D?
+
+  Just a prototype build.
 
 # Ideas base on others:
+
+  I can think of those postgresql or sqlite since they trigger conditions. But limited without module scripts access.
   
   You can search for DOOMQL that someone made pure sql build of the game.
 
