@@ -1,6 +1,12 @@
+// main entry point browser
+
+import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.6.0.min.js"
+
 import { DbConnection, tables } from './module_bindings';
 import { Identity } from 'spacetimedb';
-import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.6.0.min.js"
+import * as THREE from 'three';
+
+
 // import { Value } from 'three/examples/jsm/inspector/ui/Values.js';
 // spacetime sql --server local quickstart-chat "SELECT * FROM message"
 
@@ -10,12 +16,16 @@ const DB_NAME = 'spacetime-app-game';
 const {div, button, label, input, li, ul} = van.tags;
 
 const chat_messages = div();
-
 const chat_box = div();
-
-const entity_position = div();
+const entity_position = div({style:`background-color:gray;`});
 const el_status = van.state('None');
 const username = van.state('Guest');
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize( window.innerWidth, window.innerHeight );
+document.body.appendChild( renderer.domElement );
 
 function apply_user(ctx){
   // console.log("apply");
@@ -131,6 +141,7 @@ const conn = DbConnection.builder()
       console.log('insert entity row');
       console.log(row);
       check_position(row);
+      update_model_player(row);
     });
 
     // any change on user.
@@ -139,6 +150,7 @@ const conn = DbConnection.builder()
       console.log("oldRow:", oldRow);
       console.log("newRow:", newRow);
       check_position(newRow);
+      update_model_player(newRow);
     })
 
   })
@@ -218,7 +230,7 @@ function App(){
 
     setup();
 
-    return div(
+    return div({style:`position: fixed; top: 0; left: 0;`},
         // button({onclick:()=>test()},"test"),
         // button({onclick:()=>testHello()},"hello"),
         // button({onclick:()=>addTask()},"Add"),
@@ -235,7 +247,6 @@ function App(){
           render_name,
         ),
 
-        
         chat_box,
         chat_messages,
         entity_position
@@ -247,37 +258,114 @@ van.add(document.body, App());
 window.addEventListener('keydown',(event)=>{
   console.log("Key: ", event.code);
   if(event.code == 'KeyW'){
-    conn.reducers.updateInput({
-      directionX:0.0,
-      directionY:1.0,
-      jump:false,
-    })
+    conn.reducers.updateInput({directionX:0.0, directionY:1.0, jump:false });
   }
   if(event.code == 'KeyS'){
-    conn.reducers.updateInput({
-      directionX:0.0,
-      directionY:-1.0,
-      jump:false,
-    })
+    conn.reducers.updateInput({directionX:0.0,directionY:-1.0,jump:false });
+  }
+
+  if(event.code == 'KeyA'){
+    conn.reducers.updateInput({directionX:-1.0,directionY:0.0,jump:false });
+  }
+
+  if(event.code == 'KeyD'){
+    conn.reducers.updateInput({directionX:1.0,directionY:0.0,jump:false });
   }
 
   if(event.code == 'KeyR'){
     console.log('reset');
-    conn.reducers.setPlayerPosition({
-      x:0,
-      y:0,
-      z:0,
-    })
+    conn.reducers.setPlayerPosition({x:0,y:0,z:0});
   }
-
-  
 })
 
 window.addEventListener('keyup',(event)=>{
   console.log("key up");
-    conn.reducers.updateInput({
-      directionX:0.0,
-      directionY:0.0,
-      jump:false,
-    })
+  if(event.code == 'KeyW'){
+    conn.reducers.updateInput({directionX:0.0,directionY:0.0,jump:false});
+  }
+  if(event.code == 'KeyA'){
+    conn.reducers.updateInput({directionX:0.0,directionY:0.0,jump:false});
+  }
+  if(event.code == 'KeyS'){
+    conn.reducers.updateInput({directionX:0.0,directionY:0.0,jump:false});
+  }
+  if(event.code == 'KeyD'){
+    conn.reducers.updateInput({directionX:0.0,directionY:0.0,jump:false});
+  }
 });
+
+//-----------------------------------------------
+// 
+//-----------------------------------------------
+const geometry = new THREE.BoxGeometry( 1, 1, 1 );
+const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+const cube = new THREE.Mesh( geometry, material );
+scene.add( cube );
+
+camera.position.z = 5;
+
+
+// scene.traverse((obj) => {
+//   if (obj.userData.disposeMe) {
+//     toRemove.push(obj);
+//   }
+// });
+
+// // or even shorter with for...of (but only direct children)
+// for (const obj of scene.children) {
+//   // no recursion
+// }
+function create_cube(row){
+  const geometry = new THREE.BoxGeometry( 1, 1, 1 );
+  const material = new THREE.MeshBasicMaterial( { color: 0x00ffff } );
+  const cube = new THREE.Mesh( geometry, material );
+  cube.userData.row = row;
+  cube.position.x = row.x;
+  cube.position.y = row.y;
+  cube.position.z = row.z;
+  scene.add( cube );
+}
+
+function update_model_player(row){
+  let isFound = false;
+  console.log("check====================:", isFound);
+  // scene.traverse()
+  for (const obj_model of scene.children) {
+    // no recursion
+    console.log(obj_model.userData)
+    if (obj_model.userData?.row){
+      if (obj_model.userData.row.identity.toHexString() == row.identity.toHexString()){
+        isFound = true;
+        obj_model.userData.row = row;
+        obj_model.position.x = row.x;
+        obj_model.position.z = row.z;
+        break;
+      }
+    }
+  }
+  console.log("isFound:", isFound);
+  if(isFound){
+
+  }else{
+    console.log('create cube');
+    create_cube(row);
+  }
+
+}
+
+function animate( time ) {
+  renderer.render( scene, camera );
+
+  cube.rotation.x = time / 2000;
+  cube.rotation.y = time / 1000;
+}
+renderer.setAnimationLoop( animate );
+
+function onWindowResize(event){
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize( window.innerWidth, window.innerHeight );
+}
+
+window.addEventListener('resize',onWindowResize);
+
