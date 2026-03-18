@@ -3,7 +3,7 @@
 import { ScheduleAt } from 'spacetimedb';
 import { schema, table, t, SenderError  } from 'spacetimedb/server';
 
-console.log("db test");
+console.log("db game");
 
 const user = table(
   { 
@@ -49,6 +49,21 @@ const Entity = table(
     vz: t.f64(),
   }
 );
+// https://spacetimedb.com/docs/tables/column-types
+// Define a nested object type for coordinates
+const Coordinates3D = t.object('Coordinate3D', {
+  x: t.f64(),
+  y: t.f64(),
+  z: t.f64(),
+});
+
+const Obstacle3D = table({
+  name: 'obstacle3d', public: true
+},{
+  id: t.u64().primaryKey().autoInc(),
+  position: Coordinates3D,
+  size:Coordinates3D
+});
 
 const SimulationTick = table({ 
   name: 'simulation_tick',
@@ -68,7 +83,14 @@ const spacetimedb = schema({
   Entity,
   PlayerInput,
   SimulationTick,
+  Obstacle3D
 });
+
+export const add_two_numbers = spacetimedb.procedure(
+    { lhs: t.u32(), rhs: t.u32() },
+    t.u64(),
+    (ctx, { lhs, rhs }) => BigInt(lhs) + BigInt(rhs),
+);
 
 function validateName(name: string) {
   if (!name) {
@@ -121,10 +143,10 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
   for (const player of ctx.db.PlayerInput.iter()){
     // console.log(player);
     // console.log(player.identity.toHexString(), " x:", player.directionX, " y:", player.directionY, " Jump:", player.jump);
-    console.log("player input >>", " x:", player.directionX, " y:", player.directionY, " Jump:", player.jump);
+    // console.log("player input >>", " x:", player.directionX, " y:", player.directionY, " Jump:", player.jump);
 
     const entity = ctx.db.Entity.identity.find(player.identity);
-    console.log(entity);
+    // console.log(entity);
     if(entity){
 
       const speed = 5.0; // units per second
@@ -148,7 +170,7 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
       ctx.db.Entity.identity.update({
         ...entity,
       })
-      console.log("Position x: ", entity.x , " z: ", entity.z );
+      // console.log("Position x: ", entity.x , " z: ", entity.z );
 
     }else{// if does not exist create tmp
        ctx.db.Entity.insert({
@@ -198,9 +220,8 @@ export const update_input = spacetimedb.reducer(
   }
 );
 
-
 //-----------------------------------------------
-// 
+// PLAYER SET POSITION
 //-----------------------------------------------
 
 export const set_player_position = spacetimedb.reducer({
@@ -218,29 +239,136 @@ export const set_player_position = spacetimedb.reducer({
   }
 });
 
+//-----------------------------------------------
+// SPAWN OBSTACLE
+//-----------------------------------------------
+export const create_obstacle = spacetimedb.reducer({
+  x:t.f64(),
+  y:t.f64(),
+  z:t.f64(),
+},(ctx, args) => {
+  console.log("create obstacle");
+
+
+  ctx.db.Obstacle3D.insert({
+    position: {x:args.x,y:args.y,z:args.z},
+    size: {x:1,y:1,z:1},
+    id: 0n
+  });
+});
+
+export const update_obstacle_position_id = spacetimedb.reducer({
+  id:t.u64(),
+  x:t.f64(),
+  y:t.f64(),
+  z:t.f64(),
+},(ctx, args) => {
+  console.log("update obstacle")
+  let obstacle = ctx.db.Obstacle3D.id.find(args.id);
+  if(obstacle){
+    ctx.db.Obstacle3D.id.update({...obstacle,
+      position: {x:args.x,y:args.y,z:args.z}
+    });
+  }
+});
+
+export const delete_obstacle = spacetimedb.reducer({
+  id: t.u64()
+},(ctx, {id})=>{
+  console.log("delete id:", id);
+  ctx.db.Obstacle3D.id.delete(id);
+})
+
 
 //-----------------------------------------------
-// 
+// shop list
 //-----------------------------------------------
+export const shop_check_inventory = spacetimedb.reducer({},(ctx,{})=>{
+  console.log("check shop inventory");
+});
+
 
 //-----------------------------------------------
-// 
+// game config
 //-----------------------------------------------
+// prototype view range render for props
+// min to max
+export const game_view_range = spacetimedb.reducer({},(ctx,{})=>{
+  console.log("prototype");
+});
+
+// Testing
+export const game_start_tick = spacetimedb.reducer({tick:t.i8()},(ctx,{tick})=>{
+  console.log("prototype");
+  let isFound = false;
+  console.log("SimulationTick Counts:", ctx.db.SimulationTick.count())
+
+  if(ctx.db.SimulationTick.count() > 0n){
+    console.info("There is already sim run!!!");
+    return;
+  }
+
+  if (ctx.db.SimulationTick.count() == 0n){
+
+  }
+
+  if(isFound == false){
+    ctx.db.SimulationTick.insert({
+      scheduled_id: 0n,
+      // scheduled_at: ScheduleAt.interval(5_000_000n),// Schedule to run every 5 seconds (5,000,000 microseconds)
+      scheduled_at: ScheduleAt.interval(33_333n), // 30 tick sec???
+      lastTickTs: 0n,
+    });
+  }
+});
+
+export const game_stop_tick = spacetimedb.reducer({tick:t.i8()},(ctx,{tick})=>{
+  console.log("prototype");
+
+  if (ctx.db.SimulationTick.count() == 0n){
+    
+  }
+
+  // ctx.db.SimulationTick.scheduled_id.delete(some_scheduled_id);
+  // const allTicks = Array.from(ctx.db.simulation_tick.iter());
+  // testing...
+  const allTicks = Array.from(ctx.db.SimulationTick.iter());
+  console.log(allTicks);
+  if(allTicks.length > 0){
+    ctx.db.SimulationTick.scheduled_id.delete(allTicks[0].scheduled_id);
+  }
+
+});
+
+// Game tick set
+export const game_set_tick_rate = spacetimedb.reducer({tick:t.i8()},
+(ctx,{tick})=>{
+  console.log("prototype");
+
+
+
+});
+
+
 
 //-----------------------------------------------
 // init
 //-----------------------------------------------
+
+// scheduled_at: ScheduleAt.interval(16_666n),   // 60 ticks/second
+// scheduled_at: ScheduleAt.interval(33_333n),   // 30 ticks/second
 export const init = spacetimedb.init(ctx => {
-  console.log("===============INIT SPACETIMEDB APP NAME:::=========");
+  console.log("=============== INIT SPACETIMEDB APP NAME =========");
 
   ctx.db.SimulationTick.insert({
     scheduled_id: 0n,
     // scheduled_at: ScheduleAt.interval(5_000_000n),// Schedule to run every 5 seconds (5,000,000 microseconds)
-    scheduled_at: ScheduleAt.interval(1_000_000n),// Schedule to run every 1 seconds (1,000,000 microseconds)
+    scheduled_at: ScheduleAt.interval(33_333n), // 30 tick sec???
     lastTickTs: 0n,
   });
 
 });
+
 //-----------------------------------------------
 // onConnect
 //-----------------------------------------------
