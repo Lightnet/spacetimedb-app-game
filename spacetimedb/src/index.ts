@@ -71,7 +71,8 @@ const SimulationTick = table({
 },{
   scheduled_id: t.u64().primaryKey().autoInc(),
   scheduled_at: t.scheduleAt(),
-  lastTickTs: t.u64(),                   // ctx.timestamp.millis of last tick ???
+  // lastTickTs: t.u64(),                   // ctx.timestamp.millis of last tick ???
+  last_tick_timestamp:t.timestamp()
 });
 
 //-----------------------------------------------
@@ -136,9 +137,23 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
   // arg.message, arg.scheduled_at, arg.scheduled_id
   // console.log('update_simulation_tick');
   // console.log(arg);
+  const now = ctx.timestamp;                    // current wall time
+  let dt_accumulator_s = 0;                       // we'll compute this
 
-  const fixedDtMs = 50;           // your fixed tick rate
-  const dt = fixedDtMs / 1000;    // in seconds
+  // ── Option A: Most common & simplest (variable timestep) ────────────────
+  //     Good enough for movement, not perfect for physics/collisions
+
+  if (arg.last_tick_timestamp) {        // not first tick
+    const elapsed_ms = now.since(arg.last_tick_timestamp).millis;
+    // console.log("elapsed_ms: ", elapsed_ms);
+    dt_accumulator_s = elapsed_ms / 1000.0;       // in seconds
+  } else {
+    dt_accumulator_s = 0.033;                     // first tick guess / fallback
+  }
+  // console.log("dt_accumulator_s: ", dt_accumulator_s);
+
+  // const fixedDtMs = 50;           // your fixed tick rate
+  // const dt = fixedDtMs / 1000;    // in seconds
 
   for (const player of ctx.db.PlayerInput.iter()){
     // console.log(player);
@@ -153,18 +168,18 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
       if(player.directionX == 0){
         entity.vx = 0;
       }else{
-        entity.vx += player.directionX * speed * dt;
+        entity.vx += player.directionX * speed * dt_accumulator_s;
       }
 
       if(player.directionY == 0){
         entity.vz = 0;
       }else{
-        entity.vz += player.directionY * speed * dt;
+        entity.vz += player.directionY * speed * dt_accumulator_s;
       }
       
       // Integrate position
-      entity.x += entity.vx * dt;
-      entity.z += entity.vz * dt;
+      entity.x += entity.vx * dt_accumulator_s;
+      entity.z += entity.vz * dt_accumulator_s;
 
       //update data from table row match
       ctx.db.Entity.identity.update({
@@ -184,7 +199,27 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
        });
     }
   }
+
+
+  // ── Save the time for next call ─────────────────────────────────────────
+  ctx.db.SimulationTick.scheduled_id.update({
+    ...arg,
+    last_tick_timestamp: now,
+    // accumulator: arg.accumulator   // if using fixed style
+  });
 });
+
+//-----------------------------------------------
+// UPDATE SIMULATION TICK COLLISION
+//-----------------------------------------------
+
+export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: SimulationTick.rowType }, (ctx, { arg }) => {
+
+})
+
+
+
+
 //-----------------------------------------------
 // PLAYER INPUT
 //-----------------------------------------------
@@ -201,14 +236,14 @@ export const update_input = spacetimedb.reducer(
 
     const player_input = ctx.db.PlayerInput.identity.find(id);
     if(player_input){// update
-      console.log("update input x: ", args.directionX, " y: ", args.directionY, " Jump:", args.jump);
+      // console.log("update input x: ", args.directionX, " y: ", args.directionY, " Jump:", args.jump);
       ctx.db.PlayerInput.identity.update({...player_input,
         directionX:args.directionX,
         directionY:args.directionY,
         jump:args.jump
       });
     }else{// create
-      console.log("create input");
+      // console.log("create input");
       ctx.db.PlayerInput.insert({
         identity: id,
         directionX: args.directionX,
@@ -278,16 +313,12 @@ export const delete_obstacle = spacetimedb.reducer({
   console.log("delete id:", id);
   ctx.db.Obstacle3D.id.delete(id);
 })
-
-
 //-----------------------------------------------
 // shop list
 //-----------------------------------------------
 export const shop_check_inventory = spacetimedb.reducer({},(ctx,{})=>{
   console.log("check shop inventory");
 });
-
-
 //-----------------------------------------------
 // game config
 //-----------------------------------------------
@@ -307,28 +338,21 @@ export const game_start_tick = spacetimedb.reducer({tick:t.i8()},(ctx,{tick})=>{
     console.info("There is already sim run!!!");
     return;
   }
-
-  if (ctx.db.SimulationTick.count() == 0n){
-
-  }
-
+  // if (ctx.db.SimulationTick.count() == 0n){}
   if(isFound == false){
     ctx.db.SimulationTick.insert({
       scheduled_id: 0n,
       // scheduled_at: ScheduleAt.interval(5_000_000n),// Schedule to run every 5 seconds (5,000,000 microseconds)
       scheduled_at: ScheduleAt.interval(33_333n), // 30 tick sec???
-      lastTickTs: 0n,
+      // lastTickTs: 0n,
+      last_tick_timestamp: ctx.timestamp,       // start "now"
     });
   }
 });
 
 export const game_stop_tick = spacetimedb.reducer({tick:t.i8()},(ctx,{tick})=>{
   console.log("prototype");
-
-  if (ctx.db.SimulationTick.count() == 0n){
-    
-  }
-
+  // if (ctx.db.SimulationTick.count() == 0n){}
   // ctx.db.SimulationTick.scheduled_id.delete(some_scheduled_id);
   // const allTicks = Array.from(ctx.db.simulation_tick.iter());
   // testing...
@@ -343,12 +367,68 @@ export const game_stop_tick = spacetimedb.reducer({tick:t.i8()},(ctx,{tick})=>{
 // Game tick set
 export const game_set_tick_rate = spacetimedb.reducer({tick:t.i8()},
 (ctx,{tick})=>{
-  console.log("prototype");
+  // console.log("prototype");
+  // Remove old scheduled tick if exists
+  for (const old of ctx.db.SimulationTick.iter()) {
+    ctx.db.SimulationTick.scheduled_id.delete(old.scheduled_id);
+  }
 
+  let interval_us: bigint;
 
+  switch (tick) {
+    case 20:
+      interval_us = 50_000n;
+      break;
+    case 30:
+      interval_us = 33_333n;     // ← most people use this for 30 Hz
+      break;
+    case 50:
+      interval_us = 20_000n;
+      break;
+    case 60:
+      interval_us = 16_667n;     // ← slightly more accurate than 16_666
+      break;
+    default:
+      interval_us = 33_333n;     // fallback
+      console.warn(`Unsupported tick rate ${tick}, using 30 Hz`);
+  }
 
+  ctx.db.SimulationTick.insert({
+    scheduled_id: 0n,
+    scheduled_at: ScheduleAt.interval(interval_us),
+    // lastTickTs: 0n,   // or ctx.timestamp() if you want to start now
+    last_tick_timestamp: ctx.timestamp,       // start "now"
+  });
+
+  console.log(`Game tick rate set to ${tick} Hz (${interval_us} μs)`);
+
+  // const allTicks = Array.from(ctx.db.SimulationTick.iter());
+  // if(allTicks.length > 0){
+  //   ctx.db.SimulationTick.scheduled_id.delete(allTicks[0].scheduled_id);
+  // }
+
+  // ctx.db.SimulationTick.insert({
+  //   scheduled_id: 0n,
+  //   // scheduled_at: ScheduleAt.interval(5_000_000n),// Schedule to run every 5 seconds (5,000,000 microseconds)
+  //   scheduled_at: ScheduleAt.interval(33_333n), // 30 tick sec???
+  //   lastTickTs: 0n,
+  // });
 });
 
+export const game_current_tick = spacetimedb.view(
+  { name: 'game_current_tick', public: true },
+  t.option(SimulationTick.rowType),//return row data if exist
+  (ctx) => {
+    // console.log("log tick???")
+    // Option 1: Most common during prototyping
+    for (const tick of ctx.db.SimulationTick.iter()) {
+      // console.log("tick: ",tick.last_tick_timestamp);
+      return tick;   // return first row found, or undefined if none
+    }
+    // const simulation_tick = ctx.db.SimulationTick.iter();
+    // return undefined;
+  }
+)
 
 
 //-----------------------------------------------
@@ -364,7 +444,8 @@ export const init = spacetimedb.init(ctx => {
     scheduled_id: 0n,
     // scheduled_at: ScheduleAt.interval(5_000_000n),// Schedule to run every 5 seconds (5,000,000 microseconds)
     scheduled_at: ScheduleAt.interval(33_333n), // 30 tick sec???
-    lastTickTs: 0n,
+    // lastTickTs: 0n,
+    last_tick_timestamp: ctx.timestamp,       // start "now"
   });
 
 });

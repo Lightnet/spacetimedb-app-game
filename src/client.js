@@ -3,10 +3,47 @@
 import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.6.0.min.js"
 
 import { DbConnection, tables } from './module_bindings';
-import { Identity } from 'spacetimedb';
+// import { Identity } from 'spacetimedb';
+// import * as stdb from 'spacetimedb';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
+// import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+// import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js';
+import { Pane } from 'tweakpane';
+// import { plugins as TweakpaneTablePlugin } from 'tweakpane-table';
+// import { CompactKitBundle } from 'tweakpane-compact-kit';
+// console.log(stdb);
+
+const PARAMS = {
+  speed: 0.5,
+  message: 'hello, world',
+  selectedId:"",
+  theme: '',
+  hidden: true,
+  background: {r: 255, g: 0, b: 55},
+  tint: {r: 0, g: 255, b: 214, a: 0.5},
+  offset: {x: 50, y: 25},
+  tick:0,
+  tick_rate:0,
+  msSinceLastServerTick:0,
+  lastServerTickTimeMs:0,
+
+  wall_x:0,
+  wall_y:0,
+  wall_z:0,
+
+  block_x:1.0,
+  block_y:0,
+  block_z:0,
+
+  update1:()=>{
+    updateList(newItems);
+  },
+  update2:()=>{
+    updateList(newItems2);
+  },
+};
+
 
 // import { Value } from 'three/examples/jsm/inspector/ui/Values.js';
 // spacetime sql --server local spacetimedb-app-game "SELECT * FROM message"
@@ -31,8 +68,6 @@ const chat_messages = div({style:`background-color:gray;`});
 const chat_box = div({style:`background-color:gray;`});
 const entity_position = div({style:`background-color:gray;`});
 const wall_positions = div({style:`background-color:gray;`});
-
-
 
 const el_status = van.state('None');
 const username = van.state('Guest');
@@ -68,16 +103,16 @@ function check_position(row){
     elEntity.remove();
     van.add(entity_position,div({id:row.identity.toHexString()},
       label('entity:' + row.identity.toHexString().substring(0,16)),
-      label(" x: ",row.x),
-      label(" y: ",row.y),
-      label(" z: ",row.z)
+      label(" x: ",row.x.toFixed(4)),
+      label(" y: ",row.y.toFixed(4)),
+      label(" z: ",row.z.toFixed(4))
     ))
   }else{
     van.add(entity_position,div({id:row.identity.toHexString()},
       label('entity:' + row.identity.toHexString().substring(0,16)),
-      label(" x: ",row.x),
-      label(" y: ",row.y),
-      label(" z: ",row.z)
+      label(" x: ",row.x.toFixed(4)),
+      label(" y: ",row.y.toFixed(4)),
+      label(" z: ",row.z.toFixed(4))
     ))
   }
 }
@@ -122,6 +157,9 @@ const conn = DbConnection.builder()
     conn
       .subscriptionBuilder()
       .subscribe(tables.Entity);
+    conn
+      .subscriptionBuilder()
+      .subscribe(tables.game_current_tick);
 
     conn.db.user.onInsert((ctx, row)=>{
       // console.log('insert user row');
@@ -189,6 +227,48 @@ const conn = DbConnection.builder()
       // console.log(row);
       delete_wall(row);
       // update_model_wall(row);
+    });
+
+    conn.db.game_current_tick.onUpdate((ctx, oldRow, newRow)=>{
+      // console.log("update???");
+      // console.log("oldRow:", oldRow);
+      console.log("newRow:", newRow);
+    })
+
+    conn.db.game_current_tick.onInsert((ctx, row)=>{
+      // console.log('insert Obstacle3D row');
+      
+      // console.log(row);
+      // const millis = Number(row.lastTickTimestamp.toMillis());
+      // console.log(millis)
+      // const date = new Date(millis);  
+      // console.log("Last tick as Date:", date.toISOString());
+
+      // guess work???
+      // if (row) {
+      //   const ts = row.lastTickTimestamp;                    // Timestamp type
+      //   const millisBig = ts.toMillis();                       // bigint
+      //   const millisNum = Number(millisBig);                   // safe here (far from Number.MAX_SAFE_INTEGER)
+      //   const now = Date.now();
+      //   const msAgo = now - millisNum;
+      //   PARAMS.tick_rate = msAgo;
+      // }
+      if (row) {
+        const lastServerTickMs = Number(row.lastTickTimestamp.toMillis());
+
+        const nowMs = Date.now();
+        const msSinceLastServerTick = nowMs - lastServerTickMs;
+
+        // Most useful value for client prediction / interpolation:
+        PARAMS.msSinceLastServerTick = msSinceLastServerTick;
+
+        // Optional: also keep the absolute server time if needed later
+        PARAMS.lastServerTickTimeMs = lastServerTickMs;
+
+        // Debug / monitoring
+        // console.log(`Server last tick was ${msSinceLastServerTick.toFixed(0)} ms ago`);
+
+      }
     });
 
   })
@@ -269,26 +349,20 @@ function App(){
     setup();
     //{style:`background-color:gray;`}
     return div({style:`position: fixed; top: 0; left: 0;background-color:gray;`},
-        // button({onclick:()=>test()},"test"),
-        // button({onclick:()=>testHello()},"hello"),
-        // button({onclick:()=>addTask()},"Add"),
-        // button({onclick:()=>deleteTask()},"Delete"),
-        // input({value:text_content,oninput:(e)=>text_content.val=e.target.value}),
+      div(
+        label("Status: "),
+        el_status
+      ),
+      div(
+        name_mode,
+        label('Name: '),
+        render_name,
+      ),
 
-        div(
-          label("Status: "),
-          el_status
-        ),
-        div(
-          name_mode,
-          label('Name: '),
-          render_name,
-        ),
-
-        chat_box,
-        chat_messages,
-        entity_position,
-        wall_positions
+      chat_box,
+      chat_messages,
+      entity_position,
+      wall_positions
     )
 }
 
@@ -354,50 +428,171 @@ scene.add( gridHelper );
 
 const controls = new OrbitControls( camera, renderer.domElement );
 
-const gui = new GUI();
+const newItems = [
+  { id: '101', name: 'Updated Item A' },
+  { id: '102', name: 'Updated Item B' }
+];
 
-const app_game = {
-  name:"spacetimedb-app-game",
-  move:'W,A,S,D',
-  camera:'mouse move',
-  reset_player:'R = Key, 0,0,0',
-  addtest:()=>{
-    conn.procedures.addTwoNumbers({ lhs: 10, rhs: 20 })
-    .then(sum => {
-        console.log(`The sum is: ${sum}`); // sum will be 30n (BigInt)
-    })
-    .catch(err => {
-        console.error("Procedure failed:", err);
-    });
-  },
-  add_block:()=>{
-    console.log("added");
-    conn.reducers.createObstacle({
-      x:3.0,
-      y:0.0,
-      z:2.0
-    });
-  },
-  start_tick:()=>{
-    conn.reducers.gameStartTick({tick:30});
-  },
-  stop_tick:()=>{
-    conn.reducers.gameStopTick({tick:30});
-  },
-  set_tick:()=>{
-    conn.reducers.gameSetTickRate({tick:30});
-  },
-}
-gui.add( app_game, 'name' ).disable();   // Text Field
-gui.add( app_game, 'move' ).disable();
-gui.add( app_game, 'camera' ).disable();
-gui.add( app_game, 'reset_player' ).disable();
-gui.add( app_game, 'addtest' );
-gui.add( app_game, 'add_block' );
+const newItems2 = [
+  { id: '102', name: 'Updated Item C' },
+  { id: '104', name: 'Updated Item D' }
+];
 
-gui.add( app_game, 'start_tick' );
-gui.add( app_game, 'stop_tick' );
-gui.add( app_game, 'set_tick' );
+
+// https://tweakpane.github.io/docs/input-bindings/#number
+
+const pane = new Pane();
+// pane.element.parentElement.classList = 'tableContainer';
+// pane.registerPlugin(TweakpaneTablePlugin);
+// pane.registerPlugin(CompactKitBundle);
+
+// pane.addBinding(PARAMS, 'speed');
+// pane.addBinding(PARAMS, 'message');
+// pane.addBinding(PARAMS, 'theme', {
+//   options: {
+//     none: '',
+//     dark: 'dark-theme.json',
+//     light: 'light-theme.json',
+//   },
+// });
+// pane.addBinding(PARAMS, 'hidden');
+// pane.addBinding(PARAMS, 'background');
+// pane.addBinding(PARAMS, 'tint');
+// pane.addBinding(PARAMS, 'offset');
+
+const application = pane.addFolder({
+  title: 'Application',
+  rows: 5,
+});
+
+const app_tick = application.addFolder({
+  title: 'Tick',
+  rows: 5,
+});
+
+app_tick.addBinding(PARAMS, 'msSinceLastServerTick',{
+  readonly: true, 
+  label:'Server Tick(ms):',
+  view: 'graph',
+  min: 0,
+  // max: 300,
+  // max: 100,
+  max: 60,
+});
+
+app_tick.addButton({
+  title: 'Start',
+  // label: 'Tick',   // optional
+}).on('click', () => {
+  conn.reducers.gameStartTick({});
+});
+app_tick.addButton({
+  title: 'Stop',
+  // label: 'Tick',   // optional
+}).on('click', () => {
+  conn.reducers.gameStopTick({});
+});
+app_tick.addBinding(PARAMS, 'tick', {
+  min: 1,
+  max: 120
+});
+app_tick.addButton({
+  title: 'Set',
+  // label: 'Tick',   // optional
+}).on('click', () => {
+  console.log("tick:", PARAMS.tick);
+  conn.reducers.gameSetTickRate({tick:PARAMS.tick})
+});
+
+const playerPane = pane.addFolder({
+  title: 'Player',
+  rows: 5,
+});
+
+playerPane.addButton({
+  title: 'Reset',
+  label: 'Position',   // optional
+});
+
+const block = pane.addFolder({
+  title: 'Block',
+  rows: 5,
+});
+
+block.addBinding(PARAMS, 'block_x',{label:'x'});
+block.addBinding(PARAMS, 'block_y',{label:'y'});
+block.addBinding(PARAMS, 'block_z',{label:'z'});
+block.addButton({
+  title: ' Block',
+  label: 'Spawn',   // optional
+}).on('click', () => {
+  console.log("spawn x:", PARAMS.block_x, " y: ", PARAMS.block_y ," z:", PARAMS.block_z);
+  conn.reducers.createObstacle({
+      x: PARAMS.block_x,
+      y: PARAMS.block_y,
+      z: PARAMS.block_z
+    });
+});
+
+
+// pane.addBinding(PARAMS, 'wave', {
+//   // readonly: true,
+//   // bufferSize: 10,
+//   multiline: true,
+//   rows: 5,
+// });
+
+// const btn = pane.addButton({
+//   title: 'test',
+//   label: 'counter',   // optional
+// });
+// btn.on('click', () => {
+//   updateList(newItems);
+// });
+// const btn2 = pane.addButton({
+//   title: 'test',
+//   label: 'counter',   // optional
+// });
+// btn2.on('click', () => {
+//   updateList(newItems2);
+// });
+
+// const folderdd = pane.addFolder({ title: 'Dynamic Data' });
+// function updateList(newData) {
+//   // Dispose of all items in this specific folder
+//   folderdd.children.forEach(child => child.dispose());
+
+//   // Re-add the binding inside the folder
+//   folderdd.addBinding(PARAMS, 'selectedId', {
+//     label:'test',
+//     options: newData.map(i => ({ text: i.name, value: i.id }))
+//   });
+// }
+
+// updateList(newItems);
+
+// const f1 = pane.addFolder({
+//   title: 'Basic',
+//   rows: 5,
+// });
+
+// f1.addBinding(PARAMS, 'speed');
+
+// const items = [
+//   { id: 'uid-10', name: 'Alpha' },
+//   { id: 'uid-20', name: 'Beta' },
+// ];
+
+// // Convert to Tweakpane format
+// const dynamicOptions = items.map(item => ({
+//   text: item.name, 
+//   value: item.id
+// }));
+
+// pane.addBinding(PARAMS, 'selectedId', {
+//   options: dynamicOptions,
+// });
+
 
 // scene.traverse((obj) => {
 //   if (obj.userData.disposeMe) {
@@ -473,7 +668,7 @@ function update_wall(row){
     
     van.add(wall_positions,div({id:row.id},
       label('ID:', row.id),
-      label(' x:' + row.position.x +' y:' + row.position.x +' z:' + row.position.x),
+      label(' x:' + row.position.x.toFixed(2) +' y:' + row.position.y.toFixed(2) +' z:' + row.position.z.toFixed(2)),
       button({onclick:()=>click_wall_delete(row.id)},'delete')
     ));
   }else{
@@ -534,7 +729,6 @@ function animate( time ) {
     controls.update();
   }
   renderer.render( scene, camera );
-
   // cube.rotation.x = time / 2000;
   // cube.rotation.y = time / 1000;
 }
