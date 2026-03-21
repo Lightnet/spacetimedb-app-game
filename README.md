@@ -20,13 +20,12 @@
 # Game Features:
 - input move (wip)
 - entity (wip)
-- collision ( n/a )
+- collision 2d ( wip, simple )
 
 # render type:
-- 2d
-- 2.5d
-- 3d
-
+- 2d ( n/a )
+- 2.5d ( wip )
+- 3d ( n/a )
 
 # Notes:
 - reviewing how to create game logics in database api.
@@ -34,6 +33,8 @@
 
 # Information:
  Work on sample 2.5 world movement and collision test. By using the SpaceTimeDB to handle the server and database all one package. Which can use table and loop schedule table.
+
+ Simple input direction with collision 2d plane. Design for 2.5D world.
 
 
 # SpaceTimeDB:
@@ -120,9 +121,9 @@
   SpaceTimeDB set up for server and database application.
 
 ## Start Application:
-- required bun binary
-- install packages
-- install spacetimedb
+- Bun binary ( required )
+- install packages with bun for vitejs.
+- install spacetimedb binary.
 
 ```
 spacetime start
@@ -190,8 +191,6 @@ spacetime sql --server local spacetime-app-game "SELECT * FROM simulation_tick"
 - https://spacetimedb.com/docs/2.0.0-rc1/databases/building-publishing
 - https://spacetimedb.com/docs/2.0.0-rc1/databases/cheat-sheet
 - https://spacetimedb.com/docs/2.0.0-rc1/cli-reference
-- 
-- 
 
 ```
 spacetime publish --delete-data <DATABASE_NAME>
@@ -222,26 +221,17 @@ t.identity(), t.connectionId(), t.timestamp(), t.timeDuration(), t.scheduleAt()
 t.object('Name', { field: t.type() })
 t.enum('Name', ['Variant1', 'Variant2'])
 ```
-## database path:
-```
-mkdir /stdb
-spacetime --root-dir="" start
-```
-- this required binary path for pacetimedb-cli.exe
-
-
-
+# SpaceTimeDB dev:
 ```
 spacetime dev --server local
 ```
-
-
+- Run dev mode for real time build and watch files changes.
 
 # Refs:
 - https://spacetimedb.com/docs/functions/views
 - https://spacetimedb.com/docs/functions/procedures
 - https://spacetimedb.com/docs/tutorials/chat-app/
-- 
+
 
 # Notes:
 - Anything is possible to build on database and server module.
