@@ -20,9 +20,10 @@
 # Game Features:
 - input move (wip)
 - entity (wip)
-- collision 2d ( wip, simple )
+- collision 2d ( wip, simple 3d)
+- helper preview cube
 
-# render type:
+# Render type:
 - 2d ( n/a )
 - 2.5d ( wip )
 - 3d ( n/a )
@@ -39,6 +40,11 @@
 
   The browser will use three js, van js, spacetimedb and other packages. To keep it very simple with javascript module type for development testing.
 
+# Collision Logic:
+  Well there 3D collision on 2D plane for level height when using the ramp going up or down to make sure the collision 3D work later on the build.
+
+  There no detect yet build.
+
 # SpaceTimeDB:
   Work in progress.
   
@@ -47,23 +53,41 @@
   SpaceTimeDB is all one with Database and server with web assembly module. You can think of the server module as plugins for database that support Typescript to able to run game logic which is direct access database to query.
 
 ```
-          SpaceTimeDB
-             (one unit)
+                                        SpaceTimeDB
+                                          (one unit)
 
-   +---------------------+
-   |                     |
-   |     Database        |
-   |   + Module Logic    |  ← Reducers run here (server-side logic)
-   |     (Tables)        |
-   |                     |
-   +----------^----------+
-              │
-              │ WebSocket + auto-sync (subscriptions)
-              │
-   +----------v----------+
-   |   Browser Client    |  ← or native client, game engine, etc.
-   +---------------------+
+                                +---------------------+
+                                |                     |
+                                |     Database        |
+                                |   + Module Logic    |  ← Reducers run here (server-side logic)
+                                |     (Tables)        |
+                                |                     |
+                                +----------^----------+
+                                            │
+                                            │ WebSocket + auto-sync (subscriptions)
+                                            │
+   /-------------/             +----------v----------+
+   / web server  / ----------- |   Browser Client    |  ← or native client, game engine, etc.
+   /-------------/             +---------------------+
 ```
+
+
+```
+            SpaceTimeDB
+             (one unit)
+      +----------------------+
+      |                      |
+      |     Database         |
+      |  |----------------|  |    +----------------+
+      |  | + Web Assembly |  |    | + Module Logic |
+      |  | + Module Logic |  |----|   Client       |
+      |  |   (api)        |  |    |   (api)        |
+      |  |   (Tables)     |  |    |   (Tables)     |
+      |  |----------------|  |    +----------------+
+      |                      |
+      +----------^-----------+
+```
+  It reuqired user to code server module to export to client module to create user input to move entity object in space to able to use database tables to update and send to client to reflect in player movement. Note there are some restrict to prevent client to update but use Reducers which expose to client side to call from server.
 
 # User token and auth:
   SpacetimeDB use web socket connect to browser client as it does not track ip and default create string token. You can read more in SpaceTimeDB docs and blog from their post. The reason treat any connection as identity. Another point they forge fake ip address so it be treat as identity. Without the SpacetimeDB generate token they will not have access to database if scripted with auth. So string token is the only access identify your access to SpaceTimeDB if the person is same identity.

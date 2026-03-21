@@ -10,10 +10,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 // import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js';
 import { Pane } from 'tweakpane';
+// https://tweakpane.github.io/docs/input-bindings/#number
 // import { plugins as TweakpaneTablePlugin } from 'tweakpane-table';
 // import { CompactKitBundle } from 'tweakpane-compact-kit';
 // console.log(stdb);
-
+//-----------------------------------------------
+// 
+//-----------------------------------------------
 const PARAMS = {
   speed: 0.5,
   message: 'hello, world',
@@ -28,13 +31,11 @@ const PARAMS = {
   msSinceLastServerTick:0,
   lastServerTickTimeMs:0,
 
-  wall_x:0,
-  wall_y:0,
-  wall_z:0,
-
   block_x:1.0,
   block_y:0,
   block_z:0,
+
+  block_pos:{x:1.0,y:0.0,z:2.0},
 
   update1:()=>{
     updateList(newItems);
@@ -72,16 +73,33 @@ const wall_positions = div({style:`background-color:gray;`});
 const el_status = van.state('None');
 const username = van.state('Guest');
 //-----------------------------------------------
+// Test
+//-----------------------------------------------
+function wireframe_cube(){
+  const geometry = new THREE.BoxGeometry( 1, 1, 1 );
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x2D47BA,
+    wireframe:true
+  });
+  const cube = new THREE.Mesh( geometry, material );
+// scene.add( cube );
+  return cube;
+}
+
+
+//-----------------------------------------------
 // THREEJS
 //-----------------------------------------------
+const axesHelper = new THREE.AxesHelper(1.5); // Size 5
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 camera.position.z = 5;
 camera.position.y = 5;
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
-document.body.appendChild( renderer.domElement );
-
+let wire = wireframe_cube();
+axesHelper.add(wire);
+scene.add(axesHelper);
 // scene.background = new THREE.Color(0x87CEEB); // Sky blue color
 
 function apply_user(ctx){
@@ -116,11 +134,13 @@ function check_position(row){
     ))
   }
 }
-
+//-----------------------------------------------
+// SPACETIMEDB CONN
+//-----------------------------------------------
 // https://spacetimedb.com/docs/clients/api/
 // 
 // spacetime sql --server local spacetime-app-map "SELECT * FROM user"
-var current_id = null;
+// var current_id = null;
 const conn = DbConnection.builder()
   .withUri(HOST)
   .withDatabaseName(DB_NAME)
@@ -134,7 +154,7 @@ const conn = DbConnection.builder()
     // const user = conn.db.user.identity.find('0x'+identity.toHexString());
     // const user = conn.db.user.identity.find('0x'+identity.toHexString());
     // console.log("user: ",user);
-    current_id = identity;
+    // current_id = identity;
     // const user = conn.db.user.identity.find(identity);//nope
     // console.log("user: ",user);
 
@@ -191,7 +211,6 @@ const conn = DbConnection.builder()
         label(' Msg:'),
         label(row.text),
       ))
-
     });
 
     conn.db.Entity.onInsert((ctx, row)=>{
@@ -237,37 +256,16 @@ const conn = DbConnection.builder()
 
     conn.db.game_current_tick.onInsert((ctx, row)=>{
       // console.log('insert Obstacle3D row');
-      
-      // console.log(row);
-      // const millis = Number(row.lastTickTimestamp.toMillis());
-      // console.log(millis)
-      // const date = new Date(millis);  
-      // console.log("Last tick as Date:", date.toISOString());
-
-      // guess work???
-      // if (row) {
-      //   const ts = row.lastTickTimestamp;                    // Timestamp type
-      //   const millisBig = ts.toMillis();                       // bigint
-      //   const millisNum = Number(millisBig);                   // safe here (far from Number.MAX_SAFE_INTEGER)
-      //   const now = Date.now();
-      //   const msAgo = now - millisNum;
-      //   PARAMS.tick_rate = msAgo;
-      // }
       if (row) {
         const lastServerTickMs = Number(row.lastTickTimestamp.toMillis());
-
         const nowMs = Date.now();
         const msSinceLastServerTick = nowMs - lastServerTickMs;
-
         // Most useful value for client prediction / interpolation:
         PARAMS.msSinceLastServerTick = msSinceLastServerTick;
-
         // Optional: also keep the absolute server time if needed later
         PARAMS.lastServerTickTimeMs = lastServerTickMs;
-
         // Debug / monitoring
         // console.log(`Server last tick was ${msSinceLastServerTick.toFixed(0)} ms ago`);
-
       }
     });
 
@@ -278,6 +276,7 @@ const conn = DbConnection.builder()
   })
   .onConnectError((_ctx, error) => {
     console.error('Connection error:', error);
+    el_status.val = 'Error';
     // statusEl.textContent = 'Error: ' + error.message;
     // statusEl.style.color = 'red';
   })
@@ -285,7 +284,9 @@ const conn = DbConnection.builder()
 
 // console.log("conn.reducers");
 // console.log(conn.reducers);
-// console.log("vanjs test");
+//-----------------------------------------------
+// APP
+//-----------------------------------------------
 
 function App(){
   const isEdit = van.state(false);
@@ -366,7 +367,7 @@ function App(){
     )
 }
 
-van.add(document.body, App());
+
 
 function updateMovement() {
   const dx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
@@ -422,43 +423,21 @@ window.addEventListener('blur', () => {
 // const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
 // const cube = new THREE.Mesh( geometry, material );
 // scene.add( cube );
-
+//-----------------------------------------------
+// HELPER
+//-----------------------------------------------
 const gridHelper = new THREE.GridHelper( size, divisions );
 scene.add( gridHelper );
-
+//-----------------------------------------------
+// ORBITCONTROL
+//-----------------------------------------------
 const controls = new OrbitControls( camera, renderer.domElement );
 
-const newItems = [
-  { id: '101', name: 'Updated Item A' },
-  { id: '102', name: 'Updated Item B' }
-];
-
-const newItems2 = [
-  { id: '102', name: 'Updated Item C' },
-  { id: '104', name: 'Updated Item D' }
-];
-
-
-// https://tweakpane.github.io/docs/input-bindings/#number
+//-----------------------------------------------
+// PANEL GUI
+//-----------------------------------------------
 
 const pane = new Pane();
-// pane.element.parentElement.classList = 'tableContainer';
-// pane.registerPlugin(TweakpaneTablePlugin);
-// pane.registerPlugin(CompactKitBundle);
-
-// pane.addBinding(PARAMS, 'speed');
-// pane.addBinding(PARAMS, 'message');
-// pane.addBinding(PARAMS, 'theme', {
-//   options: {
-//     none: '',
-//     dark: 'dark-theme.json',
-//     light: 'light-theme.json',
-//   },
-// });
-// pane.addBinding(PARAMS, 'hidden');
-// pane.addBinding(PARAMS, 'background');
-// pane.addBinding(PARAMS, 'tint');
-// pane.addBinding(PARAMS, 'offset');
 
 const application = pane.addFolder({
   title: 'Application',
@@ -512,6 +491,8 @@ const playerPane = pane.addFolder({
 playerPane.addButton({
   title: 'Reset',
   label: 'Position',   // optional
+}).on('click', () => {
+  conn.reducers.setPlayerPosition({ x: 0, y: 0, z: 0 });
 });
 
 const block = pane.addFolder({
@@ -519,79 +500,29 @@ const block = pane.addFolder({
   rows: 5,
 });
 
-block.addBinding(PARAMS, 'block_x',{label:'x'});
-block.addBinding(PARAMS, 'block_y',{label:'y'});
-block.addBinding(PARAMS, 'block_z',{label:'z'});
+// block.addBinding(PARAMS, 'block_x',{label:'x'});
+// block.addBinding(PARAMS, 'block_y',{label:'y'});
+// block.addBinding(PARAMS, 'block_z',{label:'z'});
+block.addBinding(PARAMS, 'block_pos',{
+  label:'position'
+}).on('change', function(ev) {
+  // console.log(PARAMS.block_pos.x);
+  axesHelper.position.set(PARAMS.block_pos.x,PARAMS.block_pos.y,PARAMS.block_pos.z)
+
+});
+
 block.addButton({
   title: ' Block',
   label: 'Spawn',   // optional
 }).on('click', () => {
   console.log("spawn x:", PARAMS.block_x, " y: ", PARAMS.block_y ," z:", PARAMS.block_z);
   conn.reducers.createObstacle({
-      x: PARAMS.block_x,
-      y: PARAMS.block_y,
-      z: PARAMS.block_z
+      x: PARAMS.block_pos.x,
+      y: PARAMS.block_pos.y,
+      z: PARAMS.block_pos.z
     });
 });
 
-
-// pane.addBinding(PARAMS, 'wave', {
-//   // readonly: true,
-//   // bufferSize: 10,
-//   multiline: true,
-//   rows: 5,
-// });
-
-// const btn = pane.addButton({
-//   title: 'test',
-//   label: 'counter',   // optional
-// });
-// btn.on('click', () => {
-//   updateList(newItems);
-// });
-// const btn2 = pane.addButton({
-//   title: 'test',
-//   label: 'counter',   // optional
-// });
-// btn2.on('click', () => {
-//   updateList(newItems2);
-// });
-
-// const folderdd = pane.addFolder({ title: 'Dynamic Data' });
-// function updateList(newData) {
-//   // Dispose of all items in this specific folder
-//   folderdd.children.forEach(child => child.dispose());
-
-//   // Re-add the binding inside the folder
-//   folderdd.addBinding(PARAMS, 'selectedId', {
-//     label:'test',
-//     options: newData.map(i => ({ text: i.name, value: i.id }))
-//   });
-// }
-
-// updateList(newItems);
-
-// const f1 = pane.addFolder({
-//   title: 'Basic',
-//   rows: 5,
-// });
-
-// f1.addBinding(PARAMS, 'speed');
-
-// const items = [
-//   { id: 'uid-10', name: 'Alpha' },
-//   { id: 'uid-20', name: 'Beta' },
-// ];
-
-// // Convert to Tweakpane format
-// const dynamicOptions = items.map(item => ({
-//   text: item.name, 
-//   value: item.id
-// }));
-
-// pane.addBinding(PARAMS, 'selectedId', {
-//   options: dynamicOptions,
-// });
 
 
 // scene.traverse((obj) => {
@@ -616,9 +547,9 @@ function create_cube(row){
   });
   const cube = new THREE.Mesh( geometry, material );
   cube.userData.row = row;
-  cube.position.x = row.x;
-  cube.position.y = row.y;
-  cube.position.z = row.z;
+  cube.position.x = row.position.x;
+  cube.position.y = row.position.y;
+  cube.position.z = row.position.z;
   scene.add( cube );
 }
 
@@ -659,7 +590,19 @@ function click_wall_delete(id){
 
 function delete_wall(row){
   const el_item = document.getElementById(row.id);
-  el_item.remove()
+  el_item.remove();
+
+  scene.traverse((obj) => {
+    if (obj.userData?.row?.id == row.id) {
+      // obj.remove(); // nope...
+      scene.remove(obj)
+      console.log(obj.userData);
+      console.log("found????")
+      // toRemove.push(obj);
+    }
+  }); 
+
+
 }
 
 function update_wall(row){
@@ -725,6 +668,9 @@ function update_model_wall(row){
   }
 }
 
+//-----------------------------------------------
+// RENDER LOOP
+//-----------------------------------------------
 function animate( time ) {
 
   if(controls){
@@ -744,3 +690,5 @@ function onWindowResize(event){
 
 window.addEventListener('resize',onWindowResize);
 
+van.add(document.body, App());
+van.add(document.body, renderer.domElement)
