@@ -28,23 +28,23 @@
 - 3d ( n/a )
 
 # Notes:
-- reviewing how to create game logics in database api.
-- 
+- Learning how to create game logics in database api.
+- This topic focus on database, server, typescript, javascript and client browser.
+
 
 # Information:
- Work on sample 2.5 world movement and collision test. By using the SpaceTimeDB to handle the server and database all one package. Which can use table and loop schedule table.
+  This is just prototype sample build. To build 2.5D world in 2D plane collision 2D. Simple input direction with collision 2d plane.
+  
+  By using the SpaceTimeDB to handle database and server plugin module ( web assembly ) with typescript. Which can use tables and run schedule table loop logics.
 
- Simple input direction with collision 2d plane. Design for 2.5D world.
-
+  The browser will use three js, van js, spacetimedb and other packages. To keep it very simple with javascript module type for development testing.
 
 # SpaceTimeDB:
   Work in progress.
-
-  This topic focus on database, server, typescript, javascript and client browser.
   
   Using SpaceTimeDB, Bun js and browser client to keep things simple to run applications. Web server to host site for statics files.
   
-  SpaceTimeDB is Database but with the server with web assembly module. You can think of the server module as plugins for database that support Typescript to able to run game logic which is direct access database to query. Like PostgresQL that need to connect to stand alone server game network. Which SpaceTimeDB was build for it.
+  SpaceTimeDB is all one with Database and server with web assembly module. You can think of the server module as plugins for database that support Typescript to able to run game logic which is direct access database to query.
 
 ```
           SpaceTimeDB
@@ -66,22 +66,9 @@
 ```
 
 # User token and auth:
-  Spacetime use web socket browser as it does not track ip and default create token. You can read more in SpaceTimeDB docs. The reason is simple as access the browser but in web socket access. As well the dev coder have own way to custom how handle identity.
-
-# Design:
-  Simple test how player move in the world by using the SpaceTimeDB (Database and Server) without need for simulation the world by browser client.
-
-  By using the Schedule API and query table names.
-
-  By using threejs to build 3D for 2.5D?
-
-  Just a prototype build.
-
-# Ideas base on others:
-
-  I can think of those postgresql or sqlite since they trigger conditions. But limited without module scripts access.
+  SpacetimeDB use web socket connect to browser client as it does not track ip and default create string token. You can read more in SpaceTimeDB docs and blog from their post. The reason treat any connection as identity. Another point they forge fake ip address so it be treat as identity. Without the SpacetimeDB generate token they will not have access to database if scripted with auth. So string token is the only access identify your access to SpaceTimeDB if the person is same identity.
   
-  You can search for DOOMQL that someone made pure sql build of the game.
+  The developer has code their own way to how handle the identity and authority.
 
 # Server Web Assembly Module:
   There are some restriction when building game server module. It base on webassembly which act as server module. Global varaible can't use in webassembly so the only way is sql table. There is features like schedule, event and others. For the game logics would be using the schedule feature since it does loop but it would need query the tables.
@@ -91,7 +78,7 @@
   There is event can be use for damage event trigger. Found in the spacetimedb docs.
 
 # Base on ideas:
-  This remind of the someone made a Linux Kernel Port console boot as terminal. As well Doom was port SQL which name DOOMQL that found in github repo made by other user.
+  This remind of the someone made a Linux Kernel Port console boot as terminal on browser client. As well Doom was port SQL which name DOOMQL that found in github repo made by other user.
 
 # SpaceTimeDB Features:
 - table
@@ -221,11 +208,6 @@ t.identity(), t.connectionId(), t.timestamp(), t.timeDuration(), t.scheduleAt()
 t.object('Name', { field: t.type() })
 t.enum('Name', ['Variant1', 'Variant2'])
 ```
-# SpaceTimeDB dev:
-```
-spacetime dev --server local
-```
-- Run dev mode for real time build and watch files changes.
 
 # Refs:
 - https://spacetimedb.com/docs/functions/views
