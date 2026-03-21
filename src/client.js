@@ -103,16 +103,16 @@ function check_position(row){
     elEntity.remove();
     van.add(entity_position,div({id:row.identity.toHexString()},
       label('entity:' + row.identity.toHexString().substring(0,16)),
-      label(" x: ",row.x.toFixed(4)),
-      label(" y: ",row.y.toFixed(4)),
-      label(" z: ",row.z.toFixed(4))
+      label(" x: ",row.position.x.toFixed(4)),
+      label(" y: ",row.position.y.toFixed(4)),
+      label(" z: ",row.position.z.toFixed(4))
     ))
   }else{
     van.add(entity_position,div({id:row.identity.toHexString()},
       label('entity:' + row.identity.toHexString().substring(0,16)),
-      label(" x: ",row.x.toFixed(4)),
-      label(" y: ",row.y.toFixed(4)),
-      label(" z: ",row.z.toFixed(4))
+      label(" x: ",row.position.x.toFixed(4)),
+      label(" y: ",row.position.y.toFixed(4)),
+      label(" z: ",row.position.z.toFixed(4))
     ))
   }
 }
@@ -632,9 +632,11 @@ function update_model_player(row){
     if (obj_model.userData?.row){
       if (obj_model.userData.row.identity.toHexString() == row.identity.toHexString()){
         isFound = true;
+        // console.log(row.position);
         obj_model.userData.row = row;
-        obj_model.position.x = row.x;
-        obj_model.position.z = row.z;
+        obj_model.position.x = row.position.x;
+        obj_model.position.y = row.position.y;
+        obj_model.position.z = row.position.z;
         break;
       }
     }

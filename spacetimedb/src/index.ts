@@ -2,9 +2,7 @@
 
 import { ScheduleAt } from 'spacetimedb';
 import { schema, table, t, SenderError  } from 'spacetimedb/server';
-
-console.log("db game");
-
+//console.log("db game");
 
 // Add near top (or in module scope)
 const PLAYER_RADIUS = 0.45;           // tune this
@@ -26,9 +24,19 @@ function checkAABBOverlap(
          pz + PLAYER_RADIUS > bottom &&
          pz - PLAYER_RADIUS < top;
 }
-
-
-
+//-----------------------------------------------
+// OBJECT
+//-----------------------------------------------
+// https://spacetimedb.com/docs/tables/column-types
+// Define a nested object type for coordinates
+const Coordinates3D = t.object('Coordinate3D', {
+  x: t.f64(),
+  y: t.f64(),
+  z: t.f64(),
+});
+//-----------------------------------------------
+// TABLES
+//-----------------------------------------------
 const user = table(
   { 
     name: 'user', 
@@ -65,21 +73,19 @@ const Entity = table(
   { name: 'entity', public: true },
   {
     identity: t.identity().primaryKey(),
-    x: t.f64(),
-    y: t.f64(),          // in your case: y = up in 3D view, but gameplay plane x/z?
-    z: t.f64(),          // if full 3D → store z too
-    vx: t.f64(),         // velocity
-    vy: t.f64(),
-    vz: t.f64(),
+    position: Coordinates3D,
+    velocity: Coordinates3D,
+
+
+    // x: t.f64(),
+    // y: t.f64(),          // in your case: y = up in 3D view, but gameplay plane x/z?
+    // z: t.f64(),          // if full 3D → store z too
+    // vx: t.f64(),         // velocity
+    // vy: t.f64(),
+    // vz: t.f64(),
   }
 );
-// https://spacetimedb.com/docs/tables/column-types
-// Define a nested object type for coordinates
-const Coordinates3D = t.object('Coordinate3D', {
-  x: t.f64(),
-  y: t.f64(),
-  z: t.f64(),
-});
+
 
 const Obstacle3D = table({
   name: 'obstacle3d', public: true
@@ -191,20 +197,20 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
 
       const speed = 5.0; // units per second
       if(player.directionX == 0){
-        entity.vx = 0;
+        entity.velocity.x = 0;
       }else{
-        entity.vx += player.directionX * speed * dt_accumulator_s;
+        entity.velocity.x += player.directionX * speed * dt_accumulator_s;
       }
 
       if(player.directionY == 0){
-        entity.vz = 0;
+        entity.velocity.z = 0;
       }else{
-        entity.vz += player.directionY * speed * dt_accumulator_s;
+        entity.velocity.z += player.directionY * speed * dt_accumulator_s;
       }
       
       // Integrate position
-      entity.x += entity.vx * dt_accumulator_s;
-      entity.z += entity.vz * dt_accumulator_s;
+      entity.position.x += entity.velocity.x * dt_accumulator_s;
+      entity.position.z += entity.velocity.z * dt_accumulator_s;
 
       //update data from table row match
       ctx.db.Entity.identity.update({
@@ -215,12 +221,8 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
     }else{// if does not exist create tmp
        ctx.db.Entity.insert({
          identity: player.identity,
-         x: 0,
-         y: 0,
-         z: 0,
-         vx: 0,
-         vy: 0,
-         vz: 0
+         position:{x: 0, y: 0, z: 0 },
+         velocity:{x: 0, y: 0, z: 0 },
        });
     }
   }
@@ -272,15 +274,15 @@ export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: Sim
 
     const speed = 5.0; // units per second
     if(input_player.directionX == 0){
-      entity.vx = 0;
+      entity.velocity.x = 0;
     }else{
-      entity.vx += input_player.directionX * speed * dt_accumulator_s;
+      entity.velocity.x += input_player.directionX * speed * dt_accumulator_s;
     }
 
     if(input_player.directionY == 0){
-      entity.vz = 0;
+      entity.velocity.z = 0;
     }else{
-      entity.vz += input_player.directionY * speed * dt_accumulator_s;
+      entity.velocity.z += input_player.directionY * speed * dt_accumulator_s;
     }
     
     // Integrate position
@@ -288,8 +290,8 @@ export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: Sim
     // entity.z += entity.vz * dt_accumulator_s;
 
       // ── Movement prediction + collision ────────────────────────────────────────
-    let newX = entity.x + entity.vx * dt_accumulator_s;
-    let newZ = entity.z + entity.vz * dt_accumulator_s;
+    let newX = entity.position.x + entity.velocity.x * dt_accumulator_s;
+    let newZ = entity.position.z + entity.velocity.z * dt_accumulator_s;
 
     let collided = false;
 
@@ -324,11 +326,11 @@ export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: Sim
 
         if (bestAxis === 'x') {
           // push back on X only
-          newX = entity.x;           // or more precise: entity.x + entity.vx * dt * 0.1 or similar
-          entity.vx *= 0.15;         // very strong stop on X
+          newX = entity.position.x;           // or more precise: entity.x + entity.vx * dt * 0.1 or similar
+          entity.velocity.x *= 0.15;         // very strong stop on X
         } else if (bestAxis === 'z') {
-          newZ = entity.z;
-          entity.vz *= 0.15;
+          newZ = entity.position.z;
+          entity.velocity.z *= 0.15;
         }
 
         // Optional: early exit if you only want to handle one wall per tick
@@ -337,8 +339,8 @@ export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: Sim
     }
     // console.log(":collided ",collided);
     // ── Final apply ─────────────────────────────────────────────────────────────
-    entity.x = newX;
-    entity.z = newZ;
+    entity.position.x = newX;
+    entity.position.z = newZ;
 
     // if not collided move player
     // if(!collided){
@@ -350,12 +352,8 @@ export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: Sim
   }else{
     ctx.db.Entity.insert({
       identity: ctx.sender,
-      x: 0,
-      y: 0,
-      z: 0,
-      vx: 0,
-      vy: 0,
-      vz: 0
+      position:{x: 0, y: 0, z: 0},
+      velocity:{x: 0, y: 0, z: 0},
     })
   }
     
@@ -436,12 +434,12 @@ export const set_player_position = spacetimedb.reducer({
   y:t.f64(),
   z:t.f64(),
 },(ctx, args) => {
-  const entity = ctx.db.Entity.identity.find(ctx.sender);
+  const entity = ctx.db.Entity.identity.find(ctx.identity);
   console.log("entity: ", entity);
   if(entity){
-    entity.x = 0;
-    entity.y = 0;
-    entity.z = 0;
+    entity.position.x = 0;
+    entity.position.y = 0;
+    entity.position.z = 0;
     ctx.db.Entity.identity.update(entity);
   }
 });
