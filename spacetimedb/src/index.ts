@@ -284,8 +284,8 @@ export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: Sim
     }
     
     // Integrate position
-    entity.x += entity.vx * dt_accumulator_s;
-    entity.z += entity.vz * dt_accumulator_s;
+    // entity.x += entity.vx * dt_accumulator_s;
+    // entity.z += entity.vz * dt_accumulator_s;
 
       // ── Movement prediction + collision ────────────────────────────────────────
     let newX = entity.x + entity.vx * dt_accumulator_s;
@@ -341,9 +341,11 @@ export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: Sim
     entity.z = newZ;
 
     // if not collided move player
-    if(!collided){
-      ctx.db.Entity.identity.update({ ...entity });
-    }
+    // if(!collided){
+    //   ctx.db.Entity.identity.update({ ...entity });
+    // }
+
+    ctx.db.Entity.identity.update({ ...entity });
 
   }else{
     ctx.db.Entity.insert({
