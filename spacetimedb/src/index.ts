@@ -5,6 +5,30 @@ import { schema, table, t, SenderError  } from 'spacetimedb/server';
 
 console.log("db game");
 
+
+// Add near top (or in module scope)
+const PLAYER_RADIUS = 0.45;           // tune this
+const PLAYER_DIAMETER = PLAYER_RADIUS * 2;
+
+// Helper function — pure math, no DB access
+function checkAABBOverlap(
+  px: number, pz: number,           // player center
+  ox: number, oz: number,           // obstacle center
+  hw: number, hd: number            // obstacle half-width, half-depth
+): boolean {
+  const left   = ox - hw;
+  const right  = ox + hw;
+  const top    = oz + hd;           // assuming +z = "forward"
+  const bottom = oz - hd;
+
+  return px + PLAYER_RADIUS > left   &&
+         px - PLAYER_RADIUS < right  &&
+         pz + PLAYER_RADIUS > bottom &&
+         pz - PLAYER_RADIUS < top;
+}
+
+
+
 const user = table(
   { 
     name: 'user', 
@@ -67,7 +91,8 @@ const Obstacle3D = table({
 
 const SimulationTick = table({ 
   name: 'simulation_tick',
-  scheduled: (): any => update_simulation_tick
+  // scheduled: (): any => update_simulation_tick
+  scheduled: (): any => update_simulation_tick_collision2d
 },{
   scheduled_id: t.u64().primaryKey().autoInc(),
   scheduled_at: t.scheduleAt(),
@@ -214,8 +239,153 @@ export const update_simulation_tick = spacetimedb.reducer({ arg: SimulationTick.
 //-----------------------------------------------
 
 export const update_simulation_tick_collision2d = spacetimedb.reducer({ arg: SimulationTick.rowType }, (ctx, { arg }) => {
+  const now = ctx.timestamp;                    // current wall time
+  let dt_accumulator_s = 0;                       // we'll compute this
+  if (arg.last_tick_timestamp) {        // not first tick
+    const elapsed_ms = now.since(arg.last_tick_timestamp).millis;
+    // console.log("elapsed_ms: ", elapsed_ms);
+    dt_accumulator_s = elapsed_ms / 1000.0;       // in seconds
+  } else {
+    dt_accumulator_s = 0.033;                     // first tick guess / fallback
+  }
+  //---------------------------------------------
+  // logic
+  //---------------------------------------------
+  // let _player = null;
+
+  //curent one player
+  // console.log(player);
+  // console.log(player.identity.toHexString(), " x:", player.directionX, " y:", player.directionY, " Jump:", player.jump);
+  // console.log("player input >>", " x:", player.directionX, " y:", player.directionY, " Jump:", player.jump);
+  // console.log(ctx.sender);
+  const input_player = ctx.db.PlayerInput.identity.find(ctx.identity);
+  // console.log(input_player);
+  if(!input_player){
+    return;
+  }
+
+  const entity = ctx.db.Entity.identity.find(ctx.identity);
+  // console.log(entity);
+  // console.log(entity?.x, " : ", entity?.y);
+  
+  if(entity){
+
+    const speed = 5.0; // units per second
+    if(input_player.directionX == 0){
+      entity.vx = 0;
+    }else{
+      entity.vx += input_player.directionX * speed * dt_accumulator_s;
+    }
+
+    if(input_player.directionY == 0){
+      entity.vz = 0;
+    }else{
+      entity.vz += input_player.directionY * speed * dt_accumulator_s;
+    }
+    
+    // Integrate position
+    entity.x += entity.vx * dt_accumulator_s;
+    entity.z += entity.vz * dt_accumulator_s;
+
+      // ── Movement prediction + collision ────────────────────────────────────────
+    let newX = entity.x + entity.vx * dt_accumulator_s;
+    let newZ = entity.z + entity.vz * dt_accumulator_s;
+
+    let collided = false;
+
+    for (const obs of ctx.db.Obstacle3D.iter()) {
+      const halfW = obs.size.x / 2;
+      const halfD = obs.size.z / 2;
+
+      if (checkAABBOverlap(
+        newX, newZ,
+        obs.position.x, obs.position.z,
+        halfW, halfD
+      )) {
+        collided = true;
+
+        // ── Very cheap & effective fix: revert only the component we're moving into ──
+        //    (axis separation / axis-of-least-penetration style)
+
+        // How much we would penetrate on each axis
+        const penLeft   = (newX + PLAYER_RADIUS) - (obs.position.x - halfW);
+        const penRight  = (obs.position.x + halfW) - (newX - PLAYER_RADIUS);
+        const penBottom = (newZ + PLAYER_RADIUS) - (obs.position.z - halfD);
+        const penTop    = (obs.position.z + halfD) - (newZ - PLAYER_RADIUS);
+
+        // Smallest positive penetration wins (the direction we hit from)
+        let minPen = Infinity;
+        let bestAxis: 'x' | 'z' | null = null;
+
+        if (penLeft   > 0 && penLeft   < minPen) { minPen = penLeft;   bestAxis = 'x'; }
+        if (penRight  > 0 && penRight  < minPen) { minPen = penRight;  bestAxis = 'x'; }
+        if (penBottom > 0 && penBottom < minPen) { minPen = penBottom; bestAxis = 'z'; }
+        if (penTop    > 0 && penTop    < minPen) { minPen = penTop;    bestAxis = 'z'; }
+
+        if (bestAxis === 'x') {
+          // push back on X only
+          newX = entity.x;           // or more precise: entity.x + entity.vx * dt * 0.1 or similar
+          entity.vx *= 0.15;         // very strong stop on X
+        } else if (bestAxis === 'z') {
+          newZ = entity.z;
+          entity.vz *= 0.15;
+        }
+
+        // Optional: early exit if you only want to handle one wall per tick
+        // break;
+      }
+    }
+    // console.log(":collided ",collided);
+    // ── Final apply ─────────────────────────────────────────────────────────────
+    entity.x = newX;
+    entity.z = newZ;
+
+    // if not collided move player
+    if(!collided){
+      ctx.db.Entity.identity.update({ ...entity });
+    }
+
+  }else{
+    ctx.db.Entity.insert({
+      identity: ctx.sender,
+      x: 0,
+      y: 0,
+      z: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0
+    })
+  }
+    
+  // ── Save the time for next call ─────────────────────────────────────────
+  ctx.db.SimulationTick.scheduled_id.update({
+    ...arg,
+    last_tick_timestamp: now,
+    // accumulator: arg.accumulator   // if using fixed style
+  });
 
 })
+
+// 
+// export const update_simulation_tick_blank = spacetimedb.reducer({ arg: SimulationTick.rowType }, (ctx, { arg }) => {
+//   const now = ctx.timestamp;                    // current wall time
+//   let dt_accumulator_s = 0;                       // we'll compute this
+//   if (arg.last_tick_timestamp) {        // not first tick
+//     const elapsed_ms = now.since(arg.last_tick_timestamp).millis;
+//     // console.log("elapsed_ms: ", elapsed_ms);
+//     dt_accumulator_s = elapsed_ms / 1000.0;       // in seconds
+//   } else {
+//     dt_accumulator_s = 0.033;                     // first tick guess / fallback
+//   }
+//   //---------------------------------------------
+//   // logic
+//   //---------------------------------------------
+//   // ── Save the time for next call ─────────────────────────────────────────
+//   ctx.db.SimulationTick.scheduled_id.update({
+//     ...arg,
+//     last_tick_timestamp: now,
+//   });
+// })
 
 
 
@@ -231,7 +401,7 @@ export const update_input = spacetimedb.reducer(
     jump: t.bool(),
   },
   (ctx, args) => {
-    const id = ctx.sender; // or ctx.caller if different
+    const id = ctx.identity; // or ctx.caller if different
     if (!id) throw new SenderError("Not authenticated");
 
     const player_input = ctx.db.PlayerInput.identity.find(id);
