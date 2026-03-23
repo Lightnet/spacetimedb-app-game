@@ -87,7 +87,7 @@
       |                      |
       +----------^-----------+
 ```
-  It reuqired user to code server module to export to client module to create user input to move entity object in space to able to use database tables to update and send to client to reflect in player movement. Note there are some restrict to prevent client to update but use Reducers which expose to client side to call from server.
+  It required user to code server module to export to client module to create user input to move entity object in space to able to use database tables to update and send to client to reflect in player movement. Note there are some restrict to prevent client to update but use Reducers which expose to client side to call from server.
 
 # User token and auth:
   SpacetimeDB use web socket connect to browser client as it does not track ip and default create string token. You can read more in SpaceTimeDB docs and blog from their post. The reason treat any connection as identity. Another point they forge fake ip address so it be treat as identity. Without the SpacetimeDB generate token they will not have access to database if scripted with auth. So string token is the only access identify your access to SpaceTimeDB if the person is same identity.
@@ -242,3 +242,6 @@ t.enum('Name', ['Variant1', 'Variant2'])
 # Notes:
 - Anything is possible to build on database and server module.
 - 
+
+# sqlite:
+  Testing the local for collision and physics testing.
