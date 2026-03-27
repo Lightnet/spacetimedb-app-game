@@ -1,5 +1,5 @@
 {
-  "name": "spacetime-app-map",
+  "name": "spacetime-app-physics",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -11,11 +11,14 @@
     "spacetime:publish": "spacetime publish --module-path spacetimedb --server maincloud"
   },
   "dependencies": {
-    "spacetimedb": "^2.0.4",
-    "three": "^0.183.2"
+    "@tweakpane/core": "^2.0.5",
+    "spacetimedb": "^2.1.0",
+    "three": "^0.183.2",
+    "three-viewport-gizmo": "^2.2.0",
+    "tweakpane": "^4.0.5"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "vite": "^8.0.0"
   }
 }
