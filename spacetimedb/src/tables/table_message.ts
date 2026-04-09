@@ -1,14 +1,16 @@
 //-----------------------------------------------
-// test
+// table for sample message
 //-----------------------------------------------
 import { schema, table, t, SenderError  } from 'spacetimedb/server';
-import spacetimedb from '../module';
 //-----------------------------------------------
 // 
 //-----------------------------------------------
-export const add_two_numbers = spacetimedb.procedure(
-    { lhs: t.u32(), rhs: t.u32() },
-    t.u64(),
-    (ctx, { lhs, rhs }) => BigInt(lhs) + BigInt(rhs),
+export const message = table(
+  { name: 'message', public: true },
+  {
+    sender: t.identity(),
+    sent: t.timestamp(),
+    text: t.string(),
+  }
 );
 

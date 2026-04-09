@@ -1,14 +1,19 @@
 //-----------------------------------------------
-// test
+// table user
 //-----------------------------------------------
 import { schema, table, t, SenderError  } from 'spacetimedb/server';
-import spacetimedb from '../module';
 //-----------------------------------------------
 // 
 //-----------------------------------------------
-export const add_two_numbers = spacetimedb.procedure(
-    { lhs: t.u32(), rhs: t.u32() },
-    t.u64(),
-    (ctx, { lhs, rhs }) => BigInt(lhs) + BigInt(rhs),
+export const users = table(
+  { 
+    name: 'users', 
+    public: true,
+  },
+  {
+    identity: t.identity().primaryKey(),
+    name: t.string().unique(),
+    online: t.bool(),
+  }
 );
 

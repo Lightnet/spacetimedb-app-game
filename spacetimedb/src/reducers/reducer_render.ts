@@ -1,0 +1,17 @@
+//-----------------------------------------------
+// render
+// testing...
+//-----------------------------------------------
+import spacetimedb from "../module";
+//-----------------------------------------------
+// shop list
+//-----------------------------------------------
+export const shop_check_inventory = spacetimedb.reducer({},(ctx,{})=>{
+  console.log("check shop inventory");
+});
+
+export const game_view_range = spacetimedb.reducer({},(ctx,{})=>{
+  console.log("prototype");
+});
+
+

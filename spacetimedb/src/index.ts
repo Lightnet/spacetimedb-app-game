@@ -1,33 +1,80 @@
 // server api
 
-// import { ScheduleAt } from 'spacetimedb';
-import { schema, table, t, SenderError  } from 'spacetimedb/server';
-import spacetimedb, { init, onConnect, onDisconnect, update_simulation_tick_collision3d } from './module';
-import { set_name } from './reducers/reducer_user';
-import { set_player_position, create_obstacle, update_obstacle_position_id, delete_obstacle } from './reducers/reducer_entity'
-import { update_input } from './reducers/reducer_controller';
+import spacetimedb, { init, onConnect, onDisconnect, update_simulation_tick_collision3d } from "./module";
 
+import { 
+  set_name
+} from './reducers/reducer_user';
+
+import { 
+  send_message 
+} from './reducers/reducer_message'
+
+import { 
+  create_player,
+  delete_player,
+  create_player_transform3d,
+  set_player_position,
+  create_entity,
+  delete_entity,
+  create_entity_transform3d,
+  set_transform3d_position,
+  remove_transform3d,
+  create_entity_box,
+  create_entity_sphere,
+  remove_entity_body3d,
+  create_entity_box_test,
+} from './reducers/reducer_entity';
+
+import { 
+  game_start_tick,
+  game_stop_tick,
+  game_set_tick_rate,
+  game_current_tick,
+} from './reducers/reducer_simulation';
+
+import { 
+  update_input
+} from './reducers/reducer_input';
+
+import { my_player } from './views/view_entity'
+
+// note reducers need to export here.
 export {
-  //spacetimedb
+  // spacetimedb set up
   init,
   onConnect,
   onDisconnect,
-  // user
+  //
   set_name,
-  // input
+  //
+  send_message,
+  //
   update_input,
-  // physics
+  //
   update_simulation_tick_collision3d,
-  // entity
+  //
+  game_start_tick,
+  game_stop_tick,
+  game_set_tick_rate,
+  game_current_tick,
+  //
+  create_player,
+  delete_player,
+  create_player_transform3d,
+  create_entity_transform3d,
   set_player_position,
-  create_obstacle,
-  update_obstacle_position_id,
-  delete_obstacle,
+  create_entity,
+  delete_entity,
+  set_transform3d_position,
+  remove_transform3d,
+  create_entity_box,
+  create_entity_sphere,
+  remove_entity_body3d,
+  create_entity_box_test,
+  // view
+  my_player,
 }
-
-
-//-----------------------------------------------
-// EXPORT SPACETIMEDB
-//-----------------------------------------------
+// export
 export default spacetimedb;
-// console.log("end set up: spacetime-app-physics");
+
