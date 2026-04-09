@@ -3,20 +3,15 @@
 import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.6.0.min.js"
 
 import { DbConnection, tables } from './module_bindings';
-// import * as stdb from 'spacetimedb';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-// import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+import { ViewportGizmo } from "three-viewport-gizmo";
 // import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js';
 import { Pane } from 'tweakpane';
-// https://tweakpane.github.io/docs/input-bindings/#number
-// import { plugins as TweakpaneTablePlugin } from 'tweakpane-table';
-// import { CompactKitBundle } from 'tweakpane-compact-kit';
-// console.log(stdb);
+
 //-----------------------------------------------
 // 
 //-----------------------------------------------
-
 let marker;
 
 const PARAMS = {
@@ -152,6 +147,11 @@ function update_marker(){
 // ORBITCONTROL
 //-----------------------------------------------
 const controls = new OrbitControls( camera, renderer.domElement );
+const gizmo = new ViewportGizmo(camera, renderer,{
+  // placement: "bottom-right",
+  placement: "bottom-left",
+});
+gizmo.attachControls(controls);
 
 
 function check_position(row){
@@ -375,7 +375,10 @@ function onUpdate_Transform3D(ctx, oldRow, newRow){
 }
 
 function onDelete_Transform3D(ctx, row){
+  console.log("delete row", row)
   PARAMS.transforms=PARAMS.transforms.filter(r=>r.entityId != row.entityId )
+  const cmesh = scene.children.find(r=>r.userData?.row?.entityId==row.entityId);
+  scene.remove(cmesh);
 }
 
 function setupDBTransform3D(){
@@ -551,6 +554,9 @@ const application = pane.addFolder({
   title: 'Application',
   rows: 5,
 });
+
+application.expanded = false;
+
 //-----------------------------------------------
 // GAME TICK
 //-----------------------------------------------
@@ -643,7 +649,9 @@ entityFolder.addButton({title:'Create'}).on('click',()=>{
   conn.reducers.createEntity();
 });
 entityFolder.addButton({title:'Delete'})
-
+//-----------------------------------------------
+// Entities
+//-----------------------------------------------
 const entitiesFolder = entityFolder.addFolder({ title: 'Entities' });
 entitiesFolder.addButton({title:'Refresh'}).on('click',()=>{
   updateEntities()
@@ -685,24 +693,57 @@ function selectEntity(id){
   const entity = PARAMS.entities.find(r=>r.id == id)
   if(entity){
     PARAMS.entityId = id;
+    const transform = PARAMS.transforms.find(r=>r.entityId == id)
+    if(transform){
+      PARAMS.e_position.x = transform.position.x;
+      PARAMS.e_position.y = transform.position.y;
+      PARAMS.e_position.z = transform.position.z;
+      if(e_positionBinding) e_positionBinding.refresh();
+    }
 
   }
 }
-
+//-----------------------------------------------
+// Transform 3D
+//-----------------------------------------------
 const transform3dFolder = entityFolder.addFolder({ title: 'Transform 3D' });
-transform3dFolder.addBinding(PARAMS, 'e_position',{label:'Position'})
-transform3dFolder.addButton({title:'Add Transform 3D'})
-transform3dFolder.addButton({title:'Remove Transform 3D'})
+let e_positionBinding = transform3dFolder.addBinding(PARAMS, 'e_position',{label:'Position'}).on('change',()=>{
+  if(!PARAMS.entityId) return;
+  conn.reducers.setTransform3DPosition({
+    id:PARAMS.entityId,
+    x:PARAMS.e_position.x,
+    y:PARAMS.e_position.y,
+    z:PARAMS.e_position.z
+  })
+});
+transform3dFolder.addButton({title:'Add Transform 3D'}).on('click',()=>{
+  conn.reducers.createEntityTransform3D({
+    id:PARAMS.entityId,
+    x:PARAMS.e_position.x,
+    y:PARAMS.e_position.y,
+    z:PARAMS.e_position.z
+  })
+});
+transform3dFolder.addButton({title:'Remove Transform 3D'}).on('click',()=>{
+  conn.reducers.removeTransform3D({
+    id:PARAMS.entityId
+  })
+});
 
 const body3dFolder = entityFolder.addFolder({ title: 'Body3D' });
 body3dFolder.addBinding(PARAMS,'e_box',{label:'Size'});
-body3dFolder.addButton({title:'Add Box 3D'})
+body3dFolder.addButton({title:'Add Box 3D'}).on('click',()=>{
+  
+});
 body3dFolder.addBinding(PARAMS,'e_radius',{label:'Radius'});
-body3dFolder.addButton({title:'Add Sphere 3D'})
-body3dFolder.addButton({title:'Remove Body 3D'})
-
-
-
+body3dFolder.addButton({title:'Add Sphere 3D'}).on('click',()=>{
+  
+});
+body3dFolder.addButton({title:'Remove Body 3D'}).on('click',()=>{
+  conn.reducers.removeEntityBody3D({
+    id:PARAMS.entityId
+  })
+});
 
 // scene.traverse((obj) => {
 //   if (obj.userData.disposeMe) {
@@ -716,117 +757,15 @@ body3dFolder.addButton({title:'Remove Body 3D'})
 // }
 
 //-----------------------------------------------
-// PLAYER
-//-----------------------------------------------
-// function create_cube(row){
-//   const geometry = new THREE.BoxGeometry( 1, 1, 1 );
-//   const material = new THREE.MeshBasicMaterial( { 
-//     // color: 0x00ffff //green light
-//     color: 0x008000 //green
-//   });
-//   const cube = new THREE.Mesh( geometry, material );
-//   cube.userData.row = row;
-//   cube.position.x = row.position.x;
-//   cube.position.y = row.position.y;
-//   cube.position.z = row.position.z;
-//   scene.add( cube );
-// }
-
-
-// function update_model_player(row){
-//   let isFound = false;
-//   // console.log("check====================:", isFound);
-//   // scene.traverse()
-//   for (const obj_model of scene.children) {
-//     // no recursion
-//     // console.log(obj_model.userData)
-//     if (obj_model.userData?.row){
-//       if (obj_model.userData.row.identity.toHexString() == row.identity.toHexString()){
-//         isFound = true;
-//         // console.log(row.position);
-//         obj_model.userData.row = row;
-//         obj_model.position.x = row.position.x;
-//         obj_model.position.y = row.position.y;
-//         obj_model.position.z = row.position.z;
-//         break;
-//       }
-//     }
-//   }
-//   // console.log("isFound:", isFound);
-//   if(isFound){
-//   }else{
-//     // console.log('create cube');
-//     create_cube(row);
-//   }
-// }
-
-
-//-----------------------------------------------
-// WALL
-//-----------------------------------------------
-// function delete_wall(row){
-//   const el_item = document.getElementById(row.id);
-//   el_item.remove();
-//   scene.traverse((obj) => {
-//     if (obj.userData?.row?.id == row.id) {
-//       // obj.remove(); // nope...
-//       scene.remove(obj)
-//       console.log(obj.userData);
-//       console.log("found????")
-//       // toRemove.push(obj);
-//     }
-//   });
-// }
-
-// function update_wall(row){
-//   const el_item = document.getElementById(row.id);
-//   if(!el_item){
-//     van.add(wall_positions,div({id:row.id},
-//       label('ID:', row.id),
-//       label(' x:' + row.position.x.toFixed(2) +' y:' + row.position.y.toFixed(2) +' z:' + row.position.z.toFixed(2)),
-//       button({onclick:()=>click_wall_delete(row.id)},'delete')
-//     ));
-//   }else{
-//     el_item.remove();
-//     van.add(wall_positions,div({id:row.id},
-//       label('ID:', row.id),
-//       label(' x:' + row.position.x +' y:' + row.position.x +' z:' + row.position.x),
-//       button({onclick:()=>click_wall_delete(row.id)},'delete')
-//     ));
-//   }
-// }
-
-// function create_wall(row){
-//   const geometry = new THREE.BoxGeometry( 1, 1, 1 );
-//   const material = new THREE.MeshBasicMaterial( { 
-//     // color: 0x00ffff //green light
-//     color: 0xFF0000 //red
-//   });
-//   const cube = new THREE.Mesh( geometry, material );
-//   console.log("wall row");
-//   console.log(row);
-//   cube.userData.row = row;
-//   cube.position.x = row.position.x;
-//   cube.position.y = row.position.y;
-//   cube.position.z = row.position.z;
-//   console.log(cube.position);
-//   scene.add( cube );
-// }
-
-
-
-//-----------------------------------------------
 // RENDER LOOP
 //-----------------------------------------------
 function animate( time ) {
-
   if(controls){
     controls.update();
   }
   update_marker();
   renderer.render( scene, camera );
-  // cube.rotation.x = time / 2000;
-  // cube.rotation.y = time / 1000;
+  gizmo.render();//this be here front render
 }
 renderer.setAnimationLoop( animate );
 
@@ -834,6 +773,7 @@ function onWindowResize(event){
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize( window.innerWidth, window.innerHeight );
+  gizmo.update();
 }
 
 window.addEventListener('resize',onWindowResize);
